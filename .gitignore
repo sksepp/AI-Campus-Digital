@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Environment — NEVER commit secrets
+.env
+!.env.example
+*-service-account.json
+firebase-service-account.json
+google-service-account.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / lint cache
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Docker volumes
+mongo_data/
+redis_data/
+
+# Logs
+*.log

@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Campus Digital Twin – Demo | Team Kero</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;
+  --accent:#2f81f7;--accent2:#3fb950;--warn:#d29922;--danger:#f85149;
+  --text:#e6edf3;--text2:#8b949e;--text3:#484f58;
+  --radius:8px;--font:'Segoe UI',system-ui,sans-serif
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+/* TOP BAR */
+#topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border);z-index:100;flex-shrink:0}
+#topbar .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px}
+#topbar .logo .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+#topbar .badge{background:var(--accent);color:#fff;font-size:11px;padding:2px 8px;border-radius:20px;font-weight:600}
+#topbar .user{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)}
+#topbar .avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#2f81f7,#3fb950);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+/* TABS */
+#tabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;flex-shrink:0}
+.tab{padding:10px 16px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;color:var(--text2);transition:.2s;display:flex;align-items:center;gap:6px}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+.tab:hover:not(.active){color:var(--text)}
+/* MAIN LAYOUT */
+#main{flex:1;overflow:hidden;display:flex}
+/* PANELS */
+.panel{display:none;width:100%;height:100%;overflow-y:auto}
+.panel.active{display:flex}
+/* CAMPUS MAP PANEL */
+#panel-map{flex-direction:row;overflow:hidden}
+#map-sidebar{width:260px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+#map-sidebar .sidebar-head{padding:14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600}
+.building-list{padding:8px}
+.building-item{padding:10px 12px;border-radius:var(--radius);cursor:pointer;margin-bottom:4px;transition:.15s;border:1px solid transparent}
+.building-item:hover{background:var(--surface2);border-color:var(--border)}
+.building-item.selected{background:rgba(47,129,247,.15);border-color:var(--accent)}
+.building-item .b-name{font-size:13px;font-weight:600}
+.building-item .b-meta{font-size:11px;color:var(--text2);margin-top:2px}
+.status-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px}
+.open{background:#3fb950}.partial{background:#d29922}.closed{background:#f85149}
+#map-canvas{flex:1;position:relative;overflow:hidden;background:#0a0f1a}
+canvas{display:block}
+#map-info{position:absolute;top:14px;right:14px;background:rgba(22,27,34,.95);border:1px solid var(--border);border-radius:var(--radius);padding:14px;width:220px;font-size:12px;display:none}
+#map-info .info-title{font-weight:700;font-size:14px;margin-bottom:8px}
+#map-info .info-row{display:flex;justify-content:space-between;margin-bottom:5px;color:var(--text2)}
+#map-info .info-row span:last-child{color:var(--text)}
+.nav-btn{display:block;width:100%;margin-top:10px;padding:7px;background:var(--accent);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:600;cursor:pointer}
+.nav-btn:hover{background:#388bfd}
+
+/* NAVIGATION PANEL */
+#panel-nav{flex-direction:row;overflow:hidden}
+#nav-left{width:300px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;padding:16px;gap:12px}
+#nav-left h3{font-size:14px;font-weight:600}
+.route-input{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;color:var(--text);font-size:13px;width:100%}
+.route-input:focus{outline:none;border-color:var(--accent)}
+#nav-right{flex:1;position:relative;background:#0a0f1a;overflow:hidden}
+#route-steps{display:none;flex-direction:column;gap:6px;margin-top:4px}
+.step{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:var(--surface2);border-radius:6px;font-size:12px}
+.step-icon{width:22px;height:22px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:10px}
+.step.current .step-icon{background:var(--accent2);animation:pulse 1.5s infinite}
+.step-text{color:var(--text2)}.step-text strong{color:var(--text);display:block}
+.route-summary{background:rgba(47,129,247,.1);border:1px solid rgba(47,129,247,.3);border-radius:var(--radius);padding:10px 12px;font-size:12px;display:none}
+/* AI PANEL */
+#panel-ai{flex-direction:row;overflow:hidden}
+#ai-wrap{display:flex;flex-direction:column;width:100%;height:100%}
+#chat-msgs{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+#chat-msgs::-webkit-scrollbar{width:6px}
+#chat-msgs::-webkit-scrollbar-track{background:transparent}
+#chat-msgs::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.msg{max-width:72%;display:flex;flex-direction:column;gap:4px}
+.msg.user{align-self:flex-end;align-items:flex-end}
+.msg.bot{align-self:flex-start;align-items:flex-start}
+.msg-bubble{padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.5}
+.msg.user .msg-bubble{background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.msg.bot .msg-bubble{background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:4px}
+.msg-time{font-size:10px;color:var(--text3)}
+.intent-badge{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600;margin-bottom:2px}
+.intent-nav{background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.3)}
+.intent-entity{background:rgba(47,129,247,.15);color:#2f81f7;border:1px solid rgba(47,129,247,.3)}
+.intent-general{background:rgba(210,153,34,.15);color:#d29922;border:1px solid rgba(210,153,34,.3)}
+#chat-input-area{padding:14px;border-top:1px solid var(--border);display:flex;gap:8px;background:var(--surface)}
+#chat-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:var(--text);font-size:13px;resize:none;height:42px}
+#chat-input:focus{outline:none;border-color:var(--accent)}
+.send-btn{background:var(--accent);border:none;border-radius:var(--radius);padding:10px 16px;color:#fff;font-size:13px;cursor:pointer;font-weight:600;transition:.15s}
+.send-btn:hover{background:#388bfd}
+.voice-btn{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:var(--text2);cursor:pointer;transition:.15s;font-size:14px}
+.voice-btn.recording{background:rgba(248,81,73,.2);border-color:var(--danger);color:var(--danger);animation:pulse 1s infinite}
+/* FACILITIES PANEL */
+#panel-facilities{flex-direction:column;padding:20px;gap:16px;overflow-y:auto}
+.fac-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.fac-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.fac-card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.fac-card-title{font-weight:600;font-size:14px}
+.fac-card-type{font-size:11px;color:var(--text2);margin-top:2px}
+.fac-badge{font-size:11px;padding:3px 8px;border-radius:10px;font-weight:600}
+.badge-open{background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.3)}
+.badge-closed{background:rgba(248,81,73,.15);color:#f85149;border:1px solid rgba(248,81,73,.3)}
+.badge-full{background:rgba(210,153,34,.15);color:#d29922;border:1px solid rgba(210,153,34,.3)}
+.badge-unavail{background:rgba(139,148,158,.1);color:var(--text2);border:1px solid var(--border)}
+.occ-bar{height:6px;background:var(--surface2);border-radius:3px;margin:8px 0;overflow:hidden}
+.occ-fill{height:100%;border-radius:3px;transition:width 1s}
+.occ-fill.low{background:#3fb950}.occ-fill.mid{background:#d29922}.occ-fill.high{background:#f85149}
+.fac-stats{display:flex;justify-content:space-between;font-size:11px;color:var(--text2)}
+/* EMERGENCY PANEL */
+#panel-emergency{flex-direction:column;padding:20px;gap:16px}
+.emergency-header{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);border-radius:var(--radius);padding:16px;display:flex;align-items:center;gap:12px}
+.emergency-header .e-icon{font-size:28px}
+.emergency-header h2{font-size:16px;font-weight:700;color:var(--danger)}
+.emergency-header p{font-size:12px;color:var(--text2);margin-top:3px}
+.emergency-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.e-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center}
+.e-card .e-type{font-size:22px;margin-bottom:6px}
+.e-card .e-label{font-size:12px;font-weight:600}
+.e-card .e-dist{font-size:11px;color:var(--text2);margin-top:3px}
+.e-card .e-name{font-size:13px;color:var(--accent2);font-weight:600;margin-top:4px}
+.alert-btn{padding:11px 20px;border:none;border-radius:var(--radius);font-size:13px;font-weight:700;cursor:pointer;transition:.15s}
+.alert-btn.red{background:var(--danger);color:#fff}
+.alert-btn.red:hover{background:#da3633}
+/* FACULTY PANEL */
+#panel-faculty{flex-direction:column;padding:20px;gap:14px;overflow-y:auto}
+.faculty-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.faculty-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;gap:12px}
+.f-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0}
+.f-info .f-name{font-size:13px;font-weight:700}
+.f-info .f-dept{font-size:11px;color:var(--text2);margin-top:1px}
+.f-info .f-office{font-size:11px;color:var(--text2);margin-top:4px}
+.f-avail{display:inline-block;font-size:10px;padding:2px 7px;border-radius:10px;margin-top:4px;font-weight:600}
+.avail-yes{background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.3)}
+.avail-no{background:rgba(139,148,158,.1);color:var(--text2);border:1px solid var(--border)}
+/* SEARCH BAR */
+.search-bar{display:flex;gap:8px;padding:0 20px 0 0}
+.search-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;color:var(--text);font-size:13px}
+.search-input:focus{outline:none;border-color:var(--accent)}
+/* SECTION HEADER */
+.section-head{display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.section-head h2{font-size:15px;font-weight:700}
+.section-head p{font-size:12px;color:var(--text2);margin-top:2px}
+/* OVERLAY */
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;display:none;align-items:center;justify-content:center}
+#overlay.show{display:flex}
+.overlay-card{background:var(--surface);border:1px solid var(--danger);border-radius:12px;padding:28px;max-width:420px;width:90%;text-align:center}
+.overlay-card h2{color:var(--danger);font-size:20px;margin-bottom:8px}
+.overlay-card p{color:var(--text2);font-size:13px;margin-bottom:20px;line-height:1.6}
+.overlay-btn{background:var(--danger);color:#fff;border:none;padding:10px 28px;border-radius:var(--radius);font-size:14px;font-weight:700;cursor:pointer}
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 18px;font-size:13px;z-index:998;opacity:0;transform:translateY(10px);transition:.3s;pointer-events:none}
+#toast.show{opacity:1;transform:translateY(0)}
+/* TYPING INDICATOR */
+.typing{display:flex;gap:4px;align-items:center;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:14px;width:60px}
+.typing span{width:7px;height:7px;border-radius:50%;background:var(--text2);animation:blink 1.2s infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.3}40%{opacity:1}}
+</style>
+
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo">
+    <div class="dot"></div>
+    AI Campus Digital Twin
+    <span class="badge">LIVE DEMO</span>
+  </div>
+  <div class="user">
+    <span style="color:var(--text2);font-size:12px">Logged in as</span>
+    <div class="avatar">AK</div>
+    <span>Arjun Kumar &nbsp;·&nbsp; Student</span>
+  </div>
+</div>
+
+<!-- TABS -->
+<div id="tabs">
+  <div class="tab active" onclick="switchTab('map')">🗺️ Campus Map</div>
+  <div class="tab" onclick="switchTab('nav')">🧭 Navigation</div>
+  <div class="tab" onclick="switchTab('ai')">🤖 AI Assistant</div>
+  <div class="tab" onclick="switchTab('facilities')">📊 Facilities</div>
+  <div class="tab" onclick="switchTab('faculty')">👨‍🏫 Faculty</div>
+  <div class="tab" onclick="switchTab('emergency')">🚨 Emergency</div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+<!-- ══════════════ CAMPUS MAP PANEL ══════════════ -->
+<div class="panel active" id="panel-map">
+  <div id="map-sidebar">
+    <div class="sidebar-head">📍 Campus Buildings</div>
+    <div class="building-list" id="building-list"></div>
+  </div>
+  <div id="map-canvas">
+    <canvas id="campus-canvas"></canvas>
+    <div id="map-info">
+      <div class="info-title" id="info-title">–</div>
+      <div class="info-row"><span>Floors</span><span id="info-floors">–</span></div>
+      <div class="info-row"><span>Status</span><span id="info-status">–</span></div>
+      <div class="info-row"><span>Opens</span><span id="info-hours">–</span></div>
+      <div class="info-row"><span>Accessible</span><span id="info-access">–</span></div>
+      <button class="nav-btn" onclick="switchTab('nav')">🧭 Navigate Here</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ NAVIGATION PANEL ══════════════ -->
+<div class="panel" id="panel-nav">
+  <div id="nav-left">
+    <h3>🧭 Route Planner</h3>
+    <div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:4px">FROM (Your Location)</div>
+      <input class="route-input" id="nav-from" value="Main Gate (Entrance A)" readonly>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:4px">TO (Destination)</div>
+      <select class="route-input" id="nav-to" style="cursor:pointer">
+        <option value="">— Select destination —</option>
+        <option value="ai-lab">AI Lab (Block B, Floor 2)</option>
+        <option value="library">Central Library</option>
+        <option value="exam-hall">Exam Hall (Block D)</option>
+        <option value="cafeteria">Cafeteria</option>
+        <option value="admission">Admission Office</option>
+        <option value="principal">Principal's Office</option>
+      </select>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);cursor:pointer">
+      <input type="checkbox" id="accessible-route" style="accent-color:var(--accent)"> Accessible route (no stairs)
+    </label>
+    <button class="nav-btn" onclick="computeRoute()">⚡ Compute Route</button>
+    <div class="route-summary" id="route-summary"></div>
+    <div id="route-steps"></div>
+  </div>
+  <div id="nav-right">
+    <canvas id="nav-canvas"></canvas>
+  </div>
+</div>
+
+<!-- ══════════════ AI ASSISTANT PANEL ══════════════ -->
+<div class="panel" id="panel-ai">
+  <div id="ai-wrap">
+    <div id="chat-msgs">
+      <div class="msg bot">
+        <span class="intent-badge intent-general">SYSTEM</span>
+        <div class="msg-bubble">👋 Hi! I'm the AI Campus Assistant for Kero University.<br><br>Ask me anything — find rooms, get directions, check faculty availability, or learn about campus events. Try:<br><br>• <em>"Where is the AI Lab?"</em><br>• <em>"What are Dr. Sharma's office hours?"</em><br>• <em>"Is the library open now?"</em><br>• <em>"Navigate to Block C"</em></div>
+        <span class="msg-time">Just now</span>
+      </div>
+    </div>
+    <div id="chat-input-area">
+      <textarea id="chat-input" placeholder="Ask about any room, faculty, event or facility..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
+      <button class="voice-btn" id="voice-btn" onclick="toggleVoice()" title="Voice input">🎙️</button>
+      <button class="send-btn" onclick="sendMsg()">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ FACILITIES PANEL ══════════════ -->
+<div class="panel" id="panel-facilities">
+  <div class="section-head">
+    <div><h2>📊 Live Facility Status</h2><p>Real-time occupancy — updates every 30 seconds</p></div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--accent2)">
+      <div style="width:7px;height:7px;border-radius:50%;background:var(--accent2);animation:pulse 2s infinite"></div>
+      Live Feed Active
+    </div>
+  </div>
+  <div class="fac-grid" id="fac-grid"></div>
+</div>
+
+<!-- ══════════════ FACULTY PANEL ══════════════ -->
+<div class="panel" id="panel-faculty">
+  <div class="section-head">
+    <div><h2>👨‍🏫 Faculty Directory</h2><p>Find offices, hours, and availability</p></div>
+    <input class="search-input" id="faculty-search" placeholder="Search faculty by name or department…" oninput="filterFaculty()" style="width:240px">
+  </div>
+  <div class="faculty-grid" id="faculty-grid"></div>
+</div>
+
+<!-- ══════════════ EMERGENCY PANEL ══════════════ -->
+<div class="panel" id="panel-emergency">
+  <div class="emergency-header">
+    <div class="e-icon">🚨</div>
+    <div>
+      <h2>Emergency Module</h2>
+      <p>Nearest exits, first aid, and security — pre-computed, available instantly</p>
+    </div>
+  </div>
+  <div class="emergency-grid" id="emergency-grid"></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <button class="alert-btn red" onclick="triggerAlert()">📢 Broadcast Emergency Alert</button>
+    <button class="alert-btn" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)" onclick="showToast('Safe exit route computed — follow the blue path on the map')">🗺️ Show Safe Exit Route</button>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;font-size:12px">
+    <div style="font-weight:600;margin-bottom:8px">📞 Emergency Contacts</div>
+    <div style="color:var(--text2);line-height:2">Campus Security: <strong style="color:var(--text)">+91 98765 00001</strong><br>
+    First Aid Room: <strong style="color:var(--text)">Block A, Ground Floor</strong><br>
+    Fire Department: <strong style="color:var(--text)">101</strong><br>
+    Ambulance: <strong style="color:var(--text)">108</strong></div>
+  </div>
+</div>
+
+</div><!-- end #main -->
+
+<!-- EMERGENCY OVERLAY -->
+<div id="overlay">
+  <div class="overlay-card">
+    <div style="font-size:48px;margin-bottom:12px">🚨</div>
+    <h2>EMERGENCY ALERT</h2>
+    <p>A campus-wide emergency has been declared.<br>Please proceed to the nearest fire exit immediately.<br><br><strong style="color:var(--text)">Nearest exit: Block A East Door — 42m</strong></p>
+    <button class="overlay-btn" onclick="document.getElementById('overlay').classList.remove('show')">✓ Acknowledged</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════
+const BUILDINGS = [
+  {id:'blockA',name:'Block A – Admin',floors:4,status:'open',hours:'8:00–18:00',access:'Yes',color:'#2f81f7',x:120,y:100,w:160,h:80},
+  {id:'blockB',name:'Block B – Engineering',floors:5,status:'open',hours:'7:30–20:00',access:'Yes',color:'#3fb950',x:320,y:80,w:180,h:100},
+  {id:'blockC',name:'Block C – Science',floors:4,status:'open',hours:'8:00–19:00',access:'Yes',color:'#a371f7',x:540,y:100,w:160,h:80},
+  {id:'blockD',name:'Block D – Exam Centre',floors:3,status:'partial',hours:'9:00–17:00',access:'Yes',color:'#d29922',x:120,y:230,w:160,h:70},
+  {id:'library',name:'Central Library',floors:3,status:'open',hours:'8:00–22:00',access:'Yes',color:'#f0883e',x:320,y:240,w:180,h:80},
+  {id:'cafeteria',name:'Cafeteria & Food Court',floors:1,status:'open',hours:'7:00–21:00',access:'Yes',color:'#ec6547',x:540,y:230,w:160,h:70},
+  {id:'sports',name:'Sports Complex',floors:2,status:'partial',hours:'6:00–22:00',access:'No',color:'#58a6ff',x:200,y:360,w:200,h:80},
+  {id:'hostel',name:'Hostel Block',floors:6,status:'closed',hours:'24/7 residents',access:'No',color:'#8b949e',x:500,y:350,w:160,h:90},
+];
+
+const FACILITIES = [
+  {name:'Central Library',type:'Library',capacity:400,occ:310,status:'open',feed:true},
+  {name:'AI Research Lab',type:'Laboratory',capacity:40,occ:38,status:'open',feed:true},
+  {name:'Main Cafeteria',type:'Cafeteria',capacity:300,occ:190,status:'open',feed:true},
+  {name:'Parking Zone A',type:'Parking',capacity:200,occ:145,status:'open',feed:true},
+  {name:'Computer Lab 1',type:'Laboratory',capacity:60,occ:55,status:'open',feed:true},
+  {name:'Seminar Hall',type:'Classroom',capacity:200,occ:0,status:'closed',feed:true},
+  {name:'Physics Lab',type:'Laboratory',capacity:35,occ:12,status:'open',feed:true},
+  {name:'Parking Zone B',type:'Parking',capacity:150,occ:0,status:'open',feed:false},
+];
+
+const FACULTY = [
+  {name:'Dr. Priya Sharma',dept:'Computer Science',office:'Block B, Room 204',hours:'10:00–13:00',avail:true,color:'#2f81f7',init:'PS'},
+  {name:'Prof. Rajan Mehta',dept:'Electronics',office:'Block C, Room 108',hours:'14:00–17:00',avail:true,color:'#3fb950',init:'RM'},
+  {name:'Dr. Kavita Nair',dept:'Mathematics',office:'Block A, Room 312',hours:'9:00–12:00',avail:false,color:'#a371f7',init:'KN'},
+  {name:'Prof. Anil Kumar',dept:'Mechanical',office:'Block C, Room 215',hours:'11:00–14:00',avail:true,color:'#f0883e',init:'AK'},
+  {name:'Dr. Sunita Rao',dept:'Physics',office:'Block C, Room 103',hours:'15:00–18:00',avail:false,color:'#d29922',init:'SR'},
+  {name:'Prof. Deepak Joshi',dept:'Civil Engineering',office:'Block B, Room 410',hours:'10:00–12:00',avail:true,color:'#58a6ff',init:'DJ'},
+];
+
+const EMERGENCY_POINTS = [
+  {icon:'🔥',label:'Fire Exit',name:'Block A – East Door',dist:'42m'},
+  {icon:'🏥',label:'First Aid',name:'Block A – Ground Floor',dist:'65m'},
+  {icon:'🛡️',label:'Security Office',name:'Main Gate (Admin Block)',dist:'120m'},
+];
+
+const ROUTES = {
+  'ai-lab':{dest:'AI Lab – Block B, Floor 2',dist:'320m',time:'4 min',steps:[
+    {icon:'🚶',text:'Exit Main Gate, turn right on Campus Road',current:true},
+    {icon:'↗️',text:'Walk 80m toward Block B main entrance'},
+    {icon:'🏢',text:'Enter Block B through accessible entrance'},
+    {icon:'🛗',text:'Take elevator to Floor 2'},
+    {icon:'↩️',text:'Turn left in corridor, walk 30m'},
+    {icon:'📍',text:'AI Lab (B2-204) on your right – Arrived!'},
+  ]},
+  'library':{dest:'Central Library',dist:'210m',time:'3 min',steps:[
+    {icon:'🚶',text:'Exit Main Gate, take central campus path',current:true},
+    {icon:'↗️',text:'Walk straight 150m past the fountain'},
+    {icon:'📍',text:'Central Library entrance ahead – Arrived!'},
+  ]},
+  'exam-hall':{dest:'Exam Hall – Block D',dist:'180m',time:'2 min',steps:[
+    {icon:'🚶',text:'Head south from Main Gate',current:true},
+    {icon:'↙️',text:'Turn left at Block A junction, walk 80m'},
+    {icon:'🏢',text:'Enter Block D via main entrance'},
+    {icon:'📍',text:'Exam Hall (D-101) on ground floor – Arrived!'},
+  ]},
+  'cafeteria':{dest:'Cafeteria & Food Court',dist:'280m',time:'4 min',steps:[
+    {icon:'🚶',text:'Exit Main Gate, take east campus path',current:true},
+    {icon:'↗️',text:'Walk 200m past Block C'},
+    {icon:'📍',text:'Cafeteria entrance – Arrived!'},
+  ]},
+  'admission':{dest:'Admission Office – Block A',dist:'90m',time:'1 min',steps:[
+    {icon:'🚶',text:'From Main Gate, enter Block A',current:true},
+    {icon:'📍',text:'Admission Office is Room A-102, Ground Floor – Arrived!'},
+  ]},
+  'principal':{dest:"Principal's Office – Block A",dist:'130m',time:'2 min',steps:[
+    {icon:'🚶',text:'Enter Block A main entrance',current:true},
+    {icon:'🛗',text:'Take staircase or elevator to Floor 3'},
+    {icon:'📍',text:"Principal's Office – Room A-301 – Arrived!"},
+  ]},
+};
+
+const AI_RESPONSES = {
+  'ai lab':      {intent:'nav',    text:"The AI Lab is in Block B, Floor 2, Room B2-204. It's currently <strong>open</strong> with 38/40 seats occupied — nearly full! Walk time from Main Gate is about <strong>4 minutes</strong>.<br><br>Shall I start navigation?", route:'ai-lab'},
+  'block b':     {intent:'nav',    text:"Block B is the Engineering block with 5 floors. It opens at 7:30 AM and is fully accessible. Walk time from your location: <strong>3 minutes</strong>. Want me to navigate?", route:null},
+  'library':     {intent:'entity', text:"The Central Library is open <strong>8:00 AM – 10:00 PM</strong> today. Current occupancy: <strong>310/400 seats (78%)</strong> — quite busy. It's located on the central campus path, about 3 minutes from Main Gate."},
+  'sharma':      {intent:'entity', text:"<strong>Dr. Priya Sharma</strong><br>Department: Computer Science<br>Office: Block B, Room 204<br>Office Hours: <strong>10:00 AM – 1:00 PM</strong><br>Status: 🟢 <strong>Available now</strong><br><br>Want directions to her office?"},
+  'cafeteria':   {intent:'entity', text:"The Main Cafeteria is in the east campus area, open <strong>7:00 AM – 9:00 PM</strong>. Current crowd level: <strong>190/300 (63%)</strong> — moderate. About 4 minutes from Main Gate."},
+  'exam':        {intent:'nav',    text:"Exam halls are in Block D. The main Exam Hall (D-101) seats 200 students and is on the ground floor. Current status: <strong>Active exams in progress</strong>. Walk time: 2 minutes.", route:'exam-hall'},
+  'parking':     {intent:'entity', text:"Parking Zone A: <strong>145/200 (72%)</strong> — available spaces. Parking Zone B feed is currently unavailable. Zone A is near the North Gate entrance."},
+  'emergency':   {intent:'general',text:"🚨 The nearest emergency exit is <strong>Block A East Door, 42m away</strong>. First Aid is at Block A Ground Floor. Security is at the Main Gate.<br><br>In case of fire: call <strong>101</strong>. Ambulance: <strong>108</strong>. Campus security: <strong>+91 98765 00001</strong>."},
+  'navigate':    {intent:'nav',    text:"Sure! Where would you like to go? You can say a room name, block, or facility. For example: 'AI Lab', 'Library', 'Block C', or 'Cafeteria'."},
+  'events':      {intent:'general',text:"Upcoming events on campus:<br><br>📅 <strong>AI Workshop</strong> — Block B Seminar Hall, Today 3–5 PM<br>📅 <strong>Cultural Fest</strong> — Auditorium, Saturday 10 AM<br>📅 <strong>Placement Drive</strong> — Block A, Monday 9 AM<br><br>Want directions to any venue?"},
+  'hours':       {intent:'entity', text:"Campus building hours today:<br>• Block A (Admin): 8:00–18:00<br>• Block B (Engineering): 7:30–20:00<br>• Block C (Science): 8:00–19:00<br>• Library: 8:00–22:00<br>• Cafeteria: 7:00–21:00"},
+  'default':     {intent:'general',text:"I can help you find rooms, navigate to any building, check facility status, locate faculty, or get information about campus events. Could you be more specific? For example: <em>\"Where is the Computer Lab?\"</em> or <em>\"Dr. Sharma's office hours\"</em>."},
+};
+</script>
+
+<script>
+// ═══════════════════════════════════════════════
+// TAB SWITCHING
+// ═══════════════════════════════════════════════
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    const names=['map','nav','ai','facilities','faculty','emergency'];
+    t.classList.toggle('active', names[i]===name);
+  });
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  if(name==='map') drawMap();
+  if(name==='nav') drawNavCanvas();
+}
+
+// ═══════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ═══════════════════════════════════════════════
+// CAMPUS MAP (Canvas)
+// ═══════════════════════════════════════════════
+let selectedBuilding=null;
+
+function drawMap(){
+  const canvas=document.getElementById('campus-canvas');
+  const container=document.getElementById('map-canvas');
+  canvas.width=container.clientWidth;
+  canvas.height=container.clientHeight;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Background grid
+  ctx.strokeStyle='rgba(48,54,61,0.4)'; ctx.lineWidth=1;
+  for(let x=0;x<canvas.width;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
+  for(let y=0;y<canvas.height;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
+
+  // Roads
+  ctx.strokeStyle='rgba(139,148,158,0.2)'; ctx.lineWidth=12; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(50,canvas.height/2); ctx.lineTo(canvas.width-50,canvas.height/2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(canvas.width/2,30); ctx.lineTo(canvas.width/2,canvas.height-30); ctx.stroke();
+
+  // Main Gate
+  ctx.fillStyle='#3fb950'; ctx.beginPath(); ctx.arc(80, canvas.height/2, 10, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#e6edf3'; ctx.font='bold 11px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText('MAIN GATE', 80, canvas.height/2+24);
+
+  BUILDINGS.forEach(b=>{
+    const selected = selectedBuilding && selectedBuilding.id===b.id;
+    const alpha = selected ? 1 : 0.85;
+
+    // Shadow
+    ctx.shadowColor=b.color; ctx.shadowBlur= selected ? 20 : 8;
+
+    // Building rectangle
+    ctx.fillStyle=b.color+(selected?'ff':'99');
+    ctx.strokeStyle=b.color; ctx.lineWidth= selected ? 3 : 1.5;
+    roundRect(ctx, b.x, b.y, b.w, b.h, 8);
+    ctx.fill(); ctx.stroke();
+    ctx.shadowBlur=0;
+
+    // Floor lines
+    const floorH = b.h / b.floors;
+    ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=1;
+    for(let f=1;f<b.floors;f++){
+      ctx.beginPath(); ctx.moveTo(b.x,b.y+f*floorH); ctx.lineTo(b.x+b.w,b.y+f*floorH); ctx.stroke();
+    }
+
+    // Label
+    ctx.fillStyle='#fff'; ctx.font=`bold ${selected?13:11}px Segoe UI`; ctx.textAlign='center';
+    const lines=b.name.split(' – ');
+    ctx.fillText(lines[0], b.x+b.w/2, b.y+b.h/2-(lines[1]?7:0));
+    if(lines[1]){ctx.font=`10px Segoe UI`; ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.fillText(lines[1],b.x+b.w/2,b.y+b.h/2+10);}
+
+    // Status indicator
+    const statusColor = b.status==='open'?'#3fb950': b.status==='partial'?'#d29922':'#f85149';
+    ctx.fillStyle=statusColor; ctx.beginPath(); ctx.arc(b.x+b.w-10, b.y+10, 5, 0, Math.PI*2); ctx.fill();
+  });
+
+  // Compass
+  drawCompass(ctx, canvas.width-45, 45);
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r); ctx.lineTo(x+r,y+h);
+  ctx.arcTo(x,y+h,x,y+h-r,r); ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r); ctx.closePath();
+}
+
+function drawCompass(ctx,cx,cy){
+  ctx.fillStyle='rgba(22,27,34,0.8)'; ctx.beginPath(); ctx.arc(cx,cy,22,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='var(--border)'; ctx.lineWidth=1; ctx.stroke();
+  ctx.fillStyle='#f85149'; ctx.font='bold 12px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText('N',cx,cy-8);
+  ctx.fillStyle='var(--text2)'; ctx.font='10px Segoe UI';
+  ctx.fillText('S',cx,cy+14); ctx.fillText('W',cx-14,cy+4); ctx.fillText('E',cx+14,cy+4);
+}
+
+// Build sidebar
+function buildSidebar(){
+  const list=document.getElementById('building-list');
+  list.innerHTML='';
+  BUILDINGS.forEach(b=>{
+    const div=document.createElement('div');
+    div.className='building-item'; div.dataset.id=b.id;
+    div.innerHTML=`<div class="b-name">${b.name}</div>
+    <div class="b-meta"><span class="status-dot ${b.status==='open'?'open':b.status==='partial'?'partial':'closed'}"></span>${b.floors} floors &nbsp;·&nbsp; ${b.hours}</div>`;
+    div.onclick=()=>selectBuilding(b);
+    list.appendChild(div);
+  });
+}
+
+function selectBuilding(b){
+  selectedBuilding=b;
+  document.querySelectorAll('.building-item').forEach(el=>{
+    el.classList.toggle('selected', el.dataset.id===b.id);
+  });
+  document.getElementById('info-title').textContent=b.name;
+  document.getElementById('info-floors').textContent=b.floors+' floors';
+  document.getElementById('info-status').textContent=b.status.charAt(0).toUpperCase()+b.status.slice(1);
+  document.getElementById('info-hours').textContent=b.hours;
+  document.getElementById('info-access').textContent=b.access==='Yes'?'♿ Yes':'No';
+  document.getElementById('map-info').style.display='block';
+  drawMap();
+}
+
+// Canvas click
+document.getElementById('campus-canvas').addEventListener('click',function(e){
+  const rect=this.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  for(const b of BUILDINGS){
+    if(mx>=b.x&&mx<=b.x+b.w&&my>=b.y&&my<=b.y+b.h){selectBuilding(b);return;}
+  }
+});
+
+window.addEventListener('resize', ()=>{ if(document.getElementById('panel-map').classList.contains('active')) drawMap(); });
+</script>
+
+<script>
+// ═══════════════════════════════════════════════
+// NAVIGATION CANVAS
+// ═══════════════════════════════════════════════
+let navAnimFrame=0, navAnimTimer=null;
+
+function drawNavCanvas(routeKey){
+  const canvas=document.getElementById('nav-canvas');
+  const container=document.getElementById('nav-right');
+  canvas.width=container.clientWidth;
+  canvas.height=container.clientHeight;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Grid background
+  ctx.strokeStyle='rgba(48,54,61,0.3)'; ctx.lineWidth=1;
+  for(let x=0;x<canvas.width;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
+  for(let y=0;y<canvas.height;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
+
+  if(!routeKey){
+    ctx.fillStyle='rgba(139,148,158,0.3)'; ctx.font='14px Segoe UI'; ctx.textAlign='center';
+    ctx.fillText('Select a destination and click "Compute Route"', canvas.width/2, canvas.height/2);
+    return;
+  }
+
+  const r=ROUTES[routeKey];
+  // Simplified node positions for visual
+  const nodes=[
+    {x:80,y:canvas.height-60,label:'Main Gate',type:'start'},
+    {x:180,y:canvas.height-120,label:'Campus Road',type:'walk'},
+    {x:canvas.width/2-60,y:canvas.height/2+30,label:'Block Junction',type:'walk'},
+    {x:canvas.width/2,y:canvas.height/2-40,label:'Building Entry',type:'enter'},
+    {x:canvas.width/2+80,y:canvas.height/2-100,label:'Corridor',type:'walk'},
+    {x:canvas.width-100,y:100,label:r.dest,type:'dest'},
+  ];
+
+  // Draw path
+  const accessible=document.getElementById('accessible-route').checked;
+  const dashLen = accessible ? [12,0] : [8,0];
+  ctx.setLineDash(dashLen);
+  ctx.strokeStyle = accessible ? '#3fb950' : '#2f81f7';
+  ctx.lineWidth=4; ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.shadowColor=ctx.strokeStyle; ctx.shadowBlur=12;
+  ctx.beginPath(); ctx.moveTo(nodes[0].x,nodes[0].y);
+  nodes.slice(1).forEach(n=>ctx.lineTo(n.x,n.y));
+  ctx.stroke(); ctx.setLineDash([]); ctx.shadowBlur=0;
+
+  // Animated dot on path
+  const t=(navAnimFrame%100)/100;
+  const idx=Math.floor(t*(nodes.length-1));
+  const frac=t*(nodes.length-1)-idx;
+  if(idx<nodes.length-1){
+    const ax=nodes[idx].x+(nodes[idx+1].x-nodes[idx].x)*frac;
+    const ay=nodes[idx].y+(nodes[idx+1].y-nodes[idx].y)*frac;
+    ctx.fillStyle='#fff'; ctx.shadowColor='#fff'; ctx.shadowBlur=15;
+    ctx.beginPath(); ctx.arc(ax,ay,7,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+  }
+
+  // Draw nodes
+  nodes.forEach((n,i)=>{
+    const isFirst=i===0, isLast=i===nodes.length-1;
+    ctx.shadowColor=isLast?'#3fb950':isFirst?'#f85149':'#2f81f7'; ctx.shadowBlur=12;
+    ctx.fillStyle=isLast?'#3fb950':isFirst?'#f85149':'#2f81f7';
+    ctx.beginPath(); ctx.arc(n.x,n.y,isLast||isFirst?10:6,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='#e6edf3'; ctx.font=`${isLast?'bold 12px':'11px'} Segoe UI`;
+    ctx.textAlign='center'; ctx.fillText(n.label,n.x,n.y-(isLast||isFirst?18:14));
+  });
+
+  // Info box
+  ctx.fillStyle='rgba(22,27,34,0.9)';
+  roundRect(ctx, 14, 14, 200, 70, 8); ctx.fill();
+  ctx.strokeStyle='var(--border)'; ctx.lineWidth=1; ctx.stroke();
+  ctx.fillStyle='#e6edf3'; ctx.font='bold 12px Segoe UI'; ctx.textAlign='left';
+  ctx.fillText('📍 '+r.dest.split('–')[0].trim(), 26, 36);
+  ctx.fillStyle='var(--text2)'; ctx.font='11px Segoe UI';
+  ctx.fillText('Distance: '+r.dist+'  ·  ETA: '+r.time, 26, 54);
+  ctx.fillText(accessible?'♿ Accessible route':'Standard route', 26, 72);
+}
+
+function computeRoute(){
+  const dest=document.getElementById('nav-to').value;
+  if(!dest){showToast('Please select a destination first');return;}
+  const r=ROUTES[dest];
+
+  // Summary
+  const sum=document.getElementById('route-summary');
+  sum.style.display='block';
+  sum.innerHTML=`📍 <strong>${r.dest}</strong> &nbsp;·&nbsp; ${r.dist} &nbsp;·&nbsp; ⏱ ${r.time}`;
+
+  // Steps
+  const stepsDiv=document.getElementById('route-steps');
+  stepsDiv.style.display='flex';
+  stepsDiv.innerHTML='';
+  r.steps.forEach((s,i)=>{
+    const div=document.createElement('div');
+    div.className='step'+(s.current?' current':'');
+    div.innerHTML=`<div class="step-icon">${s.icon}</div><div class="step-text"><strong>Step ${i+1}</strong>${s.text}</div>`;
+    stepsDiv.appendChild(div);
+  });
+
+  showToast(`Route computed: ${r.dist} — ${r.time}`);
+
+  // Animate nav canvas
+  if(navAnimTimer) clearInterval(navAnimTimer);
+  navAnimFrame=0;
+  drawNavCanvas(dest);
+  navAnimTimer=setInterval(()=>{
+    navAnimFrame+=1;
+    drawNavCanvas(dest);
+  },40);
+}
+
+// ═══════════════════════════════════════════════
+// AI ASSISTANT
+// ═══════════════════════════════════════════════
+let voiceActive=false;
+
+function getAIResponse(msg){
+  const lower=msg.toLowerCase();
+  for(const [key,val] of Object.entries(AI_RESPONSES)){
+    if(key!=='default' && lower.includes(key)) return val;
+  }
+  return AI_RESPONSES['default'];
+}
+
+function sendMsg(){
+  const input=document.getElementById('chat-input');
+  const text=input.value.trim();
+  if(!text) return;
+  input.value='';
+
+  const msgs=document.getElementById('chat-msgs');
+  const now=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+
+  // User message
+  msgs.innerHTML+=`<div class="msg user"><div class="msg-bubble">${escHtml(text)}</div><span class="msg-time">${now}</span></div>`;
+
+  // Typing
+  const typingId='typing-'+Date.now();
+  msgs.innerHTML+=`<div class="msg bot" id="${typingId}"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  msgs.scrollTop=msgs.scrollHeight;
+
+  setTimeout(()=>{
+    document.getElementById(typingId)?.remove();
+    const resp=getAIResponse(text);
+    const intentLabel={'nav':'NAVIGATION','entity':'ENTITY QUERY','general':'GENERAL'}[resp.intent]||'GENERAL';
+    const intentClass={'nav':'intent-nav','entity':'intent-entity','general':'intent-general'}[resp.intent]||'intent-general';
+    let extra='';
+    if(resp.route){
+      extra=`<button onclick="switchTab('nav');setTimeout(()=>{document.getElementById('nav-to').value='${resp.route}';computeRoute()},100)" style="margin-top:10px;display:inline-block;padding:6px 14px;background:var(--accent);border:none;border-radius:6px;color:#fff;font-size:12px;cursor:pointer;font-weight:600">🧭 Start Navigation</button>`;
+    }
+    msgs.innerHTML+=`<div class="msg bot">
+      <span class="intent-badge ${intentClass}">${intentLabel}</span>
+      <div class="msg-bubble">${resp.text}${extra}</div>
+      <span class="msg-time">${new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span>
+    </div>`;
+    msgs.scrollTop=msgs.scrollHeight;
+  }, 900+Math.random()*600);
+}
+
+function toggleVoice(){
+  const btn=document.getElementById('voice-btn');
+  voiceActive=!voiceActive;
+  btn.classList.toggle('recording',voiceActive);
+  if(voiceActive){
+    showToast('🎙️ Listening... (demo mode)');
+    setTimeout(()=>{
+      voiceActive=false; btn.classList.remove('recording');
+      document.getElementById('chat-input').value='Where is the AI Lab?';
+      showToast('Voice recognised: "Where is the AI Lab?"');
+    },2000);
+  }
+}
+
+function escHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ═══════════════════════════════════════════════
+// FACILITIES
+// ═══════════════════════════════════════════════
+function buildFacilities(){
+  const grid=document.getElementById('fac-grid');
+  grid.innerHTML='';
+  FACILITIES.forEach(f=>{
+    const pct=f.feed ? Math.round(f.occ/f.capacity*100) : 0;
+    const near=pct>=90, badgeCls=!f.feed?'badge-unavail':f.status==='closed'?'badge-closed':near?'badge-full':'badge-open';
+    const badgeText=!f.feed?'⚠ Status Unavailable':f.status==='closed'?'Closed':near?'🔴 Near Full':'🟢 Open';
+    const fillCls=pct>=90?'high':pct>=60?'mid':'low';
+    const occText=f.feed&&f.status==='open'?`${f.occ} / ${f.capacity} occupied`:(f.status==='closed'?'Closed today':'–');
+    grid.innerHTML+=`<div class="fac-card">
+      <div class="fac-card-head">
+        <div><div class="fac-card-title">${f.name}</div><div class="fac-card-type">${f.type}</div></div>
+        <span class="fac-badge ${badgeCls}">${badgeText}</span>
+      </div>
+      ${f.feed&&f.status==='open'?`<div class="occ-bar"><div class="occ-fill ${fillCls}" style="width:${pct}%"></div></div>`:''}
+      <div class="fac-stats"><span>${occText}</span>${f.feed&&f.status==='open'?`<span>${pct}%</span>`:''}</div>
+    </div>`;
+  });
+}
+
+// Live simulation: randomly update occupancy every 8s
+setInterval(()=>{
+  FACILITIES.forEach(f=>{
+    if(f.feed&&f.status==='open'){
+      f.occ=Math.max(0,Math.min(f.capacity, f.occ+Math.floor(Math.random()*11)-5));
+    }
+  });
+  if(document.getElementById('panel-facilities').classList.contains('active')) buildFacilities();
+},8000);
+
+// ═══════════════════════════════════════════════
+// FACULTY
+// ═══════════════════════════════════════════════
+function buildFaculty(filter=''){
+  const grid=document.getElementById('faculty-grid');
+  grid.innerHTML='';
+  const filtered=FACULTY.filter(f=>!filter||f.name.toLowerCase().includes(filter.toLowerCase())||f.dept.toLowerCase().includes(filter.toLowerCase()));
+  filtered.forEach(f=>{
+    grid.innerHTML+=`<div class="faculty-card">
+      <div class="f-avatar" style="background:${f.color}22;color:${f.color};border:2px solid ${f.color}44">${f.init}</div>
+      <div class="f-info">
+        <div class="f-name">${f.name}</div>
+        <div class="f-dept">${f.dept}</div>
+        <div class="f-office">📍 ${f.office}</div>
+        <div class="f-office">🕐 ${f.hours}</div>
+        <span class="f-avail ${f.avail?'avail-yes':'avail-no'}">${f.avail?'🟢 Available':'⚫ Unavailable'}</span>
+      </div>
+    </div>`;
+  });
+  if(!filtered.length) grid.innerHTML='<p style="color:var(--text2);font-size:13px;grid-column:1/-1">No faculty found matching your search.</p>';
+}
+
+function filterFaculty(){buildFaculty(document.getElementById('faculty-search').value);}
+
+// ═══════════════════════════════════════════════
+// EMERGENCY
+// ═══════════════════════════════════════════════
+function buildEmergency(){
+  const grid=document.getElementById('emergency-grid');
+  grid.innerHTML='';
+  EMERGENCY_POINTS.forEach(e=>{
+    grid.innerHTML+=`<div class="e-card">
+      <div class="e-type">${e.icon}</div>
+      <div class="e-label">${e.label}</div>
+      <div class="e-name">${e.name}</div>
+      <div class="e-dist">📏 ${e.dist} from you</div>
+    </div>`;
+  });
+}
+
+function triggerAlert(){
+  document.getElementById('overlay').classList.add('show');
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+buildSidebar();
+buildFacilities();
+buildFaculty();
+buildEmergency();
+setTimeout(drawMap, 50);
+</script>
+</body>
+</html>
